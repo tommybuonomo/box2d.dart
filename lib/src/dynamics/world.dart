@@ -1,27 +1,3 @@
-/// *****************************************************************************
-/// Copyright (c) 2015, Daniel Murphy, Google
-/// All rights reserved.
-///
-/// Redistribution and use in source and binary forms, with or without modification,
-/// are permitted provided that the following conditions are met:
-///  * Redistributions of source code must retain the above copyright notice,
-///    this list of conditions and the following disclaimer.
-///  * Redistributions in binary form must reproduce the above copyright notice,
-///    this list of conditions and the following disclaimer in the documentation
-///    and/or other materials provided with the distribution.
-///
-/// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-/// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-/// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-/// IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-/// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-/// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-/// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-/// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-/// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-/// POSSIBILITY OF SUCH DAMAGE.
-/// *****************************************************************************
-
 part of box2d;
 
 /// The world class manages all physics entities, dynamic simulation, and asynchronous queries. The
@@ -33,6 +9,11 @@ class World {
   static const int NEW_FIXTURE = 0x0001;
   static const int LOCKED = 0x0002;
   static const int CLEAR_FORCES = 0x0004;
+
+  // TODO.spydon: Don't have these fields as static
+  static final Distance distance = Distance();
+  static final Collision collision = Collision();
+  static final TimeOfImpact toi = TimeOfImpact();
 
   int _flags = 0;
 
@@ -52,10 +33,8 @@ class World {
   ParticleDestructionListener _particleDestructionListener;
   DebugDraw debugDraw;
 
-  final IWorldPool _pool;
-
   /// This is used to compute the time step ratio to support a variable time step.
-  double _inv_dt0 = 0.0;
+  double _invDt0 = 0.0;
 
   // these are for debugging the solver
   bool _warmStarting = false;
@@ -68,42 +47,20 @@ class World {
 
   ParticleSystem _particleSystem;
 
-  static List<List<ContactRegister>> _create2D(int a, int b) {
-    var res = new List<List<ContactRegister>>(a);
-    for (int i = 0; i < a; i++) {
-      res[i] = new List<ContactRegister>(b);
-    }
-    return res;
-  }
-
-  List<List<ContactRegister>> contactStacks =
-      _create2D(ShapeType.values.length, ShapeType.values.length);
-
   /// Construct a world object.
   ///
   /// @param gravity the world gravity vector.
   factory World.withGravity(Vector2 gravity) {
-    var w = new World.withPool(gravity,
-        new DefaultWorldPool(WORLD_POOL_SIZE, WORLD_POOL_CONTAINER_SIZE));
-    return w;
+    return World.withGravityAndStrategy(gravity, DynamicTree());
   }
 
-  /// Construct a world object.
-  ///
-  /// @param gravity the world gravity vector.
-  factory World.withPool(Vector2 gravity, IWorldPool pool) {
-    var w = new World.withPoolAndStrategy(gravity, pool, new DynamicTree());
-    return w;
+  factory World.withGravityAndStrategy(
+      Vector2 gravity, BroadPhaseStrategy strategy) {
+    return World(gravity, DefaultBroadPhaseBuffer(strategy));
   }
 
-  factory World.withPoolAndStrategy(
-      Vector2 gravity, IWorldPool pool, BroadPhaseStrategy strategy) {
-    var w = new World(gravity, pool, new DefaultBroadPhaseBuffer(strategy));
-    return w;
-  }
-
-  World(Vector2 gravity, this._pool, BroadPhase broadPhase)
-      : _gravity = new Vector2.copy(gravity) {
+  World(Vector2 gravity, BroadPhase broadPhase)
+      : _gravity = Vector2.copy(gravity) {
     _destructionListener = null;
     debugDraw = null;
 
@@ -122,14 +79,14 @@ class World {
 
     _flags = CLEAR_FORCES;
 
-    _inv_dt0 = 0.0;
+    _invDt0 = 0.0;
 
-    _contactManager = new ContactManager(this, broadPhase);
-    _profile = new Profile();
+    _contactManager = ContactManager(this, broadPhase);
+    _profile = Profile();
 
-    _particleSystem = new ParticleSystem(this);
+    _particleSystem = ParticleSystem(this);
 
-    _initializeRegisters();
+    //_initializeRegisters();
   }
 
   void setAllowSleep(bool flag) {
@@ -157,36 +114,6 @@ class World {
     return _allowSleep;
   }
 
-  void _addType(
-      IDynamicStack<Contact> creator, ShapeType type1, ShapeType type2) {
-    ContactRegister register = new ContactRegister();
-    register.creator = creator;
-    register.primary = true;
-    contactStacks[type1.index][type2.index] = register;
-
-    if (type1 != type2) {
-      ContactRegister register2 = new ContactRegister();
-      register2.creator = creator;
-      register2.primary = false;
-      contactStacks[type2.index][type1.index] = register2;
-    }
-  }
-
-  void _initializeRegisters() {
-    _addType(_pool.getCircleContactStack(), ShapeType.CIRCLE, ShapeType.CIRCLE);
-    _addType(
-        _pool.getPolyCircleContactStack(), ShapeType.POLYGON, ShapeType.CIRCLE);
-    _addType(_pool.getPolyContactStack(), ShapeType.POLYGON, ShapeType.POLYGON);
-    _addType(
-        _pool.getEdgeCircleContactStack(), ShapeType.EDGE, ShapeType.CIRCLE);
-    _addType(
-        _pool.getEdgePolyContactStack(), ShapeType.EDGE, ShapeType.POLYGON);
-    _addType(
-        _pool.getChainCircleContactStack(), ShapeType.CHAIN, ShapeType.CIRCLE);
-    _addType(
-        _pool.getChainPolyContactStack(), ShapeType.CHAIN, ShapeType.POLYGON);
-  }
-
   DestructionListener getDestructionListener() {
     return _destructionListener;
   }
@@ -197,50 +124,6 @@ class World {
 
   void setParticleDestructionListener(ParticleDestructionListener listener) {
     _particleDestructionListener = listener;
-  }
-
-  Contact popContact(
-      Fixture fixtureA, int indexA, Fixture fixtureB, int indexB) {
-    final ShapeType type1 = fixtureA.getType();
-    final ShapeType type2 = fixtureB.getType();
-
-    final ContactRegister reg = contactStacks[type1.index][type2.index];
-    if (reg != null) {
-      if (reg.primary) {
-        Contact c = reg.creator.pop();
-        c.init(fixtureA, indexA, fixtureB, indexB);
-        return c;
-      } else {
-        Contact c = reg.creator.pop();
-        c.init(fixtureB, indexB, fixtureA, indexA);
-        return c;
-      }
-    } else {
-      return null;
-    }
-  }
-
-  void pushContact(Contact contact) {
-    Fixture fixtureA = contact.fixtureA;
-    Fixture fixtureB = contact.fixtureB;
-
-    if (contact._manifold.pointCount > 0 &&
-        !fixtureA.isSensor() &&
-        !fixtureB.isSensor()) {
-      fixtureA.getBody().setAwake(true);
-      fixtureB.getBody().setAwake(true);
-    }
-
-    ShapeType type1 = fixtureA.getType();
-    ShapeType type2 = fixtureB.getType();
-
-    IDynamicStack<Contact> creator =
-        contactStacks[type1.index][type2.index].creator;
-    creator.push(contact);
-  }
-
-  IWorldPool getPool() {
-    return _pool;
   }
 
   /// Register a destruction listener. The listener is owned by you and must remain in scope.
@@ -284,7 +167,7 @@ class World {
       return null;
     }
     // TODO djm pooling
-    Body b = new Body(def, this);
+    Body b = Body(def, this);
 
     // add to world doubly linked list
     b._prev = null;
@@ -518,9 +401,9 @@ class World {
 
   // djm pooling
   // TODO(srdjan): Make fields private.
-  final TimeStep step = new TimeStep();
-  final Timer stepTimer = new Timer();
-  final Timer tempTimer = new Timer();
+  final TimeStep step = TimeStep();
+  final Timer stepTimer = Timer();
+  final Timer tempTimer = Timer();
 
   /// Take a time step. This performs collision detection, integration, and constraint solution.
   ///
@@ -530,10 +413,8 @@ class World {
   void stepDt(double dt, int velocityIterations, int positionIterations) {
     stepTimer.reset();
     tempTimer.reset();
-    // log.debug("Starting step");
     // If new fixtures were added, we need to find the new contacts.
     if ((_flags & NEW_FIXTURE) == NEW_FIXTURE) {
-      // log.debug("There's a new fixture, lets look for new contacts");
       _contactManager.findNewContacts();
       _flags &= ~NEW_FIXTURE;
     }
@@ -549,7 +430,7 @@ class World {
       step.inv_dt = 0.0;
     }
 
-    step.dtRatio = _inv_dt0 * dt;
+    step.dtRatio = _invDt0 * dt;
 
     step.warmStarting = _warmStarting;
     _profile.stepInit.record(tempTimer.getMilliseconds());
@@ -577,7 +458,7 @@ class World {
     }
 
     if (step.dt > 0.0) {
-      _inv_dt0 = step.inv_dt;
+      _invDt0 = step.inv_dt;
     }
 
     if ((_flags & CLEAR_FORCES) == CLEAR_FORCES) {
@@ -585,7 +466,6 @@ class World {
     }
 
     _flags &= ~LOCKED;
-    // log.debug("ending step");
 
     _profile.step.record(stepTimer.getMilliseconds());
   }
@@ -602,11 +482,10 @@ class World {
     }
   }
 
-  final Color3i color = new Color3i.zero();
-  final Transform xf = new Transform.zero();
-  final Vector2 cA = new Vector2.zero();
-  final Vector2 cB = new Vector2.zero();
-  final Vec2Array avs = new Vec2Array();
+  final Color3i color = Color3i.zero();
+  final Transform xf = Transform.zero();
+  final Vector2 cA = Vector2.zero();
+  final Vector2 cB = Vector2.zero();
 
   /// Call this to draw shapes and other debug draw data.
   void drawDebugData() {
@@ -655,8 +534,8 @@ class World {
           c = c.getNext()) {
         Fixture fixtureA = c.fixtureA;
         Fixture fixtureB = c.fixtureB;
-        fixtureA.getAABB(c.getChildIndexA()).getCenterToOut(cA);
-        fixtureB.getAABB(c.getChildIndexB()).getCenterToOut(cB);
+        cA.setFrom(fixtureA.getAABB(c.getChildIndexA()).getCenter());
+        cB.setFrom(fixtureB.getAABB(c.getChildIndexB()).getCenter());
         debugDraw.drawSegment(cA, cB, color);
       }
     }
@@ -674,7 +553,7 @@ class World {
             FixtureProxy proxy = f._proxies[i];
             AABB aabb = _contactManager.broadPhase.getFatAABB(proxy.proxyId);
             if (aabb != null) {
-              List<Vector2> vs = avs.get(4);
+              List<Vector2> vs = List<Vector2>(4);
               vs[0].setValues(aabb.lowerBound.x, aabb.lowerBound.y);
               vs[1].setValues(aabb.upperBound.x, aabb.lowerBound.y);
               vs[2].setValues(aabb.upperBound.x, aabb.upperBound.y);
@@ -687,7 +566,7 @@ class World {
     }
 
     if ((flags & DebugDraw.CENTER_OF_MASS_BIT) != 0) {
-      final Color3i xfColor = new Color3i(255, 0, 0);
+      final Color3i xfColor = Color3i(255, 0, 0);
       for (Body b = bodyList; b != null; b = b.getNext()) {
         xf.set(b._transform);
         xf.p.setFrom(b.worldCenter);
@@ -702,7 +581,7 @@ class World {
     debugDraw.flush();
   }
 
-  final WorldQueryWrapper wqwrapper = new WorldQueryWrapper();
+  final WorldQueryWrapper wqwrapper = WorldQueryWrapper();
 
   /// Query the world for all fixtures that potentially overlap the provided AABB.
   ///
@@ -735,8 +614,8 @@ class World {
     _particleSystem.queryAABB(particleCallback, aabb);
   }
 
-  final WorldRayCastWrapper wrcwrapper = new WorldRayCastWrapper();
-  final RayCastInput input = new RayCastInput();
+  final WorldRayCastWrapper wrcwrapper = WorldRayCastWrapper();
+  final RayCastInput input = RayCastInput();
 
   /// Ray-cast the world for all fixtures in the path of the ray. Your callback controls whether you
   /// get the closest point, any point, or n-points. The ray-cast ignores shapes that contain the
@@ -851,10 +730,10 @@ class World {
     return (_flags & CLEAR_FORCES) == CLEAR_FORCES;
   }
 
-  final Island island = new Island();
-  List<Body> stack =
-      new List<Body>(10); // TODO djm find a good initial stack number;
-  final Timer broadphaseTimer = new Timer();
+  final Island island = Island();
+  // TODO djm find a good initial stack number;
+  List<Body> stack = List<Body>(10);
+  final Timer broadphaseTimer = Timer();
 
   void solve(TimeStep step) {
     _profile.solveInit.startAccum();
@@ -884,7 +763,7 @@ class World {
     // Build and simulate all awake islands.
     int stackSize = _bodyCount;
     if (stack.length < stackSize) {
-      stack = new List<Body>(stackSize);
+      stack = List<Body>(stackSize);
     }
     for (Body seed = bodyList; seed != null; seed = seed._next) {
       if ((seed._flags & Body.ISLAND_FLAG) == Body.ISLAND_FLAG) {
@@ -1019,13 +898,13 @@ class World {
     _profile.broadphase.record(broadphaseTimer.getMilliseconds());
   }
 
-  final Island toiIsland = new Island();
-  final TOIInput toiInput = new TOIInput();
-  final TOIOutput toiOutput = new TOIOutput();
-  final TimeStep subStep = new TimeStep();
-  final List<Body> tempBodies = new List<Body>(2);
-  final Sweep backup1 = new Sweep();
-  final Sweep backup2 = new Sweep();
+  final Island toiIsland = Island();
+  final TOIInput toiInput = TOIInput();
+  final TOIOutput toiOutput = TOIOutput();
+  final TimeStep subStep = TimeStep();
+  final List<Body> tempBodies = List<Body>(2);
+  final Sweep backup1 = Sweep();
+  final Sweep backup2 = Sweep();
 
   void solveTOI(final TimeStep step) {
     final Island island = toiIsland;
@@ -1123,7 +1002,7 @@ class World {
           input.sweepB.set(bB._sweep);
           input.tMax = 1.0;
 
-          _pool.getTimeOfImpact().timeOfImpact(toiOutput, input);
+          toi.timeOfImpact(toiOutput, input);
 
           // Beta is the fraction of the remaining portion of the .
           double beta = toiOutput.t;
@@ -1315,10 +1194,8 @@ class World {
     Transform xf2 = bodyB._transform;
     Vector2 x1 = xf1.p;
     Vector2 x2 = xf2.p;
-    Vector2 p1 = _pool.popVec2();
-    Vector2 p2 = _pool.popVec2();
-    joint.getAnchorA(p1);
-    joint.getAnchorB(p2);
+    Vector2 p1 = Vector2.copy(joint.getAnchorA());
+    Vector2 p2 = Vector2.copy(joint.getAnchorB());
 
     color.setFromRGBd(0.5, 0.8, 0.8);
 
@@ -1352,7 +1229,6 @@ class World {
         debugDraw.drawSegment(p1, p2, color);
         debugDraw.drawSegment(x2, p2, color);
     }
-    _pool.pushVec2(2);
   }
 
   // NOTE this corresponds to the liquid test, so the debugdraw can draw
@@ -1360,15 +1236,14 @@ class World {
   static int LIQUID_INT = 1234598372;
   double liquidLength = .12;
   double averageLinearVel = -1.0;
-  final Vector2 liquidOffset = new Vector2.zero();
-  final Vector2 circCenterMoved = new Vector2.zero();
-  final Color3i liquidColor = new Color3i.fromRGBd(.4, .4, 1.0);
+  final Vector2 liquidOffset = Vector2.zero();
+  final Vector2 circCenterMoved = Vector2.zero();
+  final Color3i liquidColor = Color3i.fromRGBd(.4, .4, 1.0);
 
-  final Vector2 center = new Vector2.zero();
-  final Vector2 axis = new Vector2.zero();
-  final Vector2 v1 = new Vector2.zero();
-  final Vector2 v2 = new Vector2.zero();
-  final Vec2Array tlvertices = new Vec2Array();
+  final Vector2 center = Vector2.zero();
+  final Vector2 axis = Vector2.zero();
+  final Vector2 v1 = Vector2.zero();
+  final Vector2 v2 = Vector2.zero();
 
   void drawShape(Fixture fixture, Transform xf, Color3i color, bool wireframe) {
     switch (fixture.getType()) {
@@ -1376,8 +1251,7 @@ class World {
         {
           final circle = fixture.getShape() as CircleShape;
 
-          // Vec2 center = Mul(xf, circle.m_p);
-          Transform.mulToOutUnsafeVec2(xf, circle.p, center);
+          center.setFrom(Transform.mulVec2(xf, circle.position));
           double radius = circle.radius;
           xf.q.getXAxis(axis);
 
@@ -1411,11 +1285,10 @@ class World {
           final poly = fixture.getShape() as PolygonShape;
           int vertexCount = poly.count;
           assert(vertexCount <= Settings.maxPolygonVertices);
-          List<Vector2> vertices = tlvertices.get(Settings.maxPolygonVertices);
+          List<Vector2> vertices = List<Vector2>(Settings.maxPolygonVertices);
 
           for (int i = 0; i < vertexCount; ++i) {
-            // vertices[i] = Mul(xf, poly.m_vertices[i]);
-            Transform.mulToOutUnsafeVec2(xf, poly.vertices[i], vertices[i]);
+            vertices[i] = Transform.mulVec2(xf, poly.vertices[i]);
           }
           if (wireframe) {
             debugDraw.drawPolygon(vertices, vertexCount, color);
@@ -1427,8 +1300,8 @@ class World {
       case ShapeType.EDGE:
         {
           final edge = fixture.getShape() as EdgeShape;
-          Transform.mulToOutUnsafeVec2(xf, edge.vertex1, v1);
-          Transform.mulToOutUnsafeVec2(xf, edge.vertex2, v2);
+          v1.setFrom(Transform.mulVec2(xf, edge.vertex1));
+          v2.setFrom(Transform.mulVec2(xf, edge.vertex2));
           debugDraw.drawSegment(v1, v2, color);
         }
         break;
@@ -1438,9 +1311,9 @@ class World {
           int count = chain._count;
           List<Vector2> vertices = chain._vertices;
 
-          Transform.mulToOutUnsafeVec2(xf, vertices[0], v1);
+          v1.setFrom(Transform.mulVec2(xf, vertices[0]));
           for (int i = 1; i < count; ++i) {
-            Transform.mulToOutUnsafeVec2(xf, vertices[i], v2);
+            v2.setFrom(Transform.mulVec2(xf, vertices[i]));
             debugDraw.drawSegment(v1, v2, color);
             debugDraw.drawCircle(v1, 0.05, color);
             v1.setFrom(v2);
@@ -1780,9 +1653,9 @@ class WorldQueryWrapper implements TreeCallback {
 
 class WorldRayCastWrapper implements TreeRayCastCallback {
   // djm pooling
-  final RayCastOutput _output = new RayCastOutput();
-  final Vector2 _temp = new Vector2.zero();
-  final Vector2 _point = new Vector2.zero();
+  final RayCastOutput _output = RayCastOutput();
+  final Vector2 _temp = Vector2.zero();
+  final Vector2 _point = Vector2.zero();
 
   double raycastCallback(RayCastInput input, int nodeId) {
     final userData = broadPhase.getUserData(nodeId) as FixtureProxy;

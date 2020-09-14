@@ -1,34 +1,10 @@
-/// *****************************************************************************
-/// Copyright (c) 2015, Daniel Murphy, Google
-/// All rights reserved.
-///
-/// Redistribution and use in source and binary forms, with or without modification,
-/// are permitted provided that the following conditions are met:
-///  * Redistributions of source code must retain the above copyright notice,
-///    this list of conditions and the following disclaimer.
-///  * Redistributions in binary form must reproduce the above copyright notice,
-///    this list of conditions and the following disclaimer in the documentation
-///    and/or other materials provided with the distribution.
-///
-/// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-/// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-/// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-/// IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-/// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-/// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-/// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-/// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-/// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-/// POSSIBILITY OF SUCH DAMAGE.
-/// *****************************************************************************
-
 part of box2d;
 
 /// GJK using Voronoi regions (Christer Ericson) and Barycentric coordinates.
 class _SimplexVertex {
-  final Vector2 wA = new Vector2.zero(); // support point in shapeA
-  final Vector2 wB = new Vector2.zero(); // support point in shapeB
-  final Vector2 w = new Vector2.zero(); // wB - wA
+  final Vector2 wA = Vector2.zero(); // support point in shapeA
+  final Vector2 wB = Vector2.zero(); // support point in shapeB
+  final Vector2 w = Vector2.zero(); // wB - wA
   double a = 0.0; // barycentric coordinate for closest point
   int indexA = 0; // wA index
   int indexB = 0; // wB index
@@ -49,10 +25,10 @@ class SimplexCache {
   int count = 0;
 
   /// vertices on shape A
-  final List<int> indexA = BufferUtils.allocClearIntList(3);
+  final List<int> indexA = BufferUtils.intList(3);
 
   /// vertices on shape B
-  final List<int> indexB = BufferUtils.allocClearIntList(3);
+  final List<int> indexB = BufferUtils.intList(3);
 
   SimplexCache() {
     indexA[0] = Settings.INTEGER_MAX_VALUE;
@@ -64,18 +40,18 @@ class SimplexCache {
   }
 
   void set(SimplexCache sc) {
-    BufferUtils.arraycopy(sc.indexA, 0, indexA, 0, indexA.length);
-    BufferUtils.arraycopy(sc.indexB, 0, indexB, 0, indexB.length);
+    BufferUtils.arrayCopy(sc.indexA, 0, indexA, 0, indexA.length);
+    BufferUtils.arrayCopy(sc.indexB, 0, indexB, 0, indexB.length);
     metric = sc.metric;
     count = sc.count;
   }
 }
 
 class _Simplex {
-  final _SimplexVertex v1 = new _SimplexVertex();
-  final _SimplexVertex v2 = new _SimplexVertex();
-  final _SimplexVertex v3 = new _SimplexVertex();
-  final List<_SimplexVertex> vertices = new List<_SimplexVertex>(3);
+  final _SimplexVertex v1 = _SimplexVertex();
+  final _SimplexVertex v2 = _SimplexVertex();
+  final _SimplexVertex v3 = _SimplexVertex();
+  final List<_SimplexVertex> vertices = List<_SimplexVertex>(3);
   int count = 0;
 
   _Simplex() {
@@ -97,8 +73,8 @@ class _Simplex {
       v.indexB = cache.indexB[i];
       Vector2 wALocal = proxyA.getVertex(v.indexA);
       Vector2 wBLocal = proxyB.getVertex(v.indexB);
-      Transform.mulToOutUnsafeVec2(transformA, wALocal, v.wA);
-      Transform.mulToOutUnsafeVec2(transformB, wBLocal, v.wB);
+      v.wA.setFrom(Transform.mulVec2(transformA, wALocal));
+      v.wB.setFrom(Transform.mulVec2(transformB, wBLocal));
       v.w
         ..setFrom(v.wB)
         ..sub(v.wA);
@@ -125,8 +101,8 @@ class _Simplex {
       v.indexB = 0;
       Vector2 wALocal = proxyA.getVertex(0);
       Vector2 wBLocal = proxyB.getVertex(0);
-      Transform.mulToOutUnsafeVec2(transformA, wALocal, v.wA);
-      Transform.mulToOutUnsafeVec2(transformB, wBLocal, v.wB);
+      v.wA.setFrom(Transform.mulVec2(transformA, wALocal));
+      v.wB.setFrom(Transform.mulVec2(transformB, wBLocal));
       v.w
         ..setFrom(v.wB)
         ..sub(v.wA);
@@ -144,7 +120,7 @@ class _Simplex {
     }
   }
 
-  final Vector2 _e12 = new Vector2.zero();
+  final Vector2 _e12 = Vector2.zero();
 
   void getSearchDirection(final Vector2 out) {
     switch (count) {
@@ -179,8 +155,8 @@ class _Simplex {
   }
 
   // djm pooled
-  final Vector2 _case2 = new Vector2.zero();
-  final Vector2 _case22 = new Vector2.zero();
+  final Vector2 _case2 = Vector2.zero();
+  final Vector2 _case22 = Vector2.zero();
 
   /// This returns pooled objects. don't keep or modify them
   void getClosestPoint(final Vector2 out) {
@@ -213,8 +189,8 @@ class _Simplex {
   }
 
   // djm pooled, and from above
-  final Vector2 _case3 = new Vector2.zero();
-  final Vector2 _case33 = new Vector2.zero();
+  final Vector2 _case3 = Vector2.zero();
+  final Vector2 _case33 = Vector2.zero();
 
   void getWitnessPoints(Vector2 pA, Vector2 pB) {
     switch (count) {
@@ -357,11 +333,11 @@ class _Simplex {
   }
 
   // djm pooled, and from above
-  final Vector2 _e13 = new Vector2.zero();
-  final Vector2 _e23 = new Vector2.zero();
-  final Vector2 _w1 = new Vector2.zero();
-  final Vector2 _w2 = new Vector2.zero();
-  final Vector2 _w3 = new Vector2.zero();
+  final Vector2 _e13 = Vector2.zero();
+  final Vector2 _e23 = Vector2.zero();
+  final Vector2 _w1 = Vector2.zero();
+  final Vector2 _w2 = Vector2.zero();
+  final Vector2 _w3 = Vector2.zero();
 
   /// Solve a line segment using barycentric coordinates.<br/>
   /// Possible regions:<br/>
@@ -485,10 +461,10 @@ class DistanceProxy {
   final List<Vector2> buffer;
 
   DistanceProxy()
-      : vertices = new List<Vector2>(Settings.maxPolygonVertices),
-        buffer = new List<Vector2>(2) {
+      : vertices = List<Vector2>(Settings.maxPolygonVertices),
+        buffer = List<Vector2>(2) {
     for (int i = 0; i < vertices.length; i++) {
-      vertices[i] = new Vector2.zero();
+      vertices[i] = Vector2.zero();
     }
     _count = 0;
     radius = 0.0;
@@ -500,7 +476,7 @@ class DistanceProxy {
     switch (shape.shapeType) {
       case ShapeType.CIRCLE:
         final circle = shape as CircleShape;
-        vertices[0].setFrom(circle.p);
+        vertices[0].setFrom(circle.position);
         _count = 1;
         radius = circle.radius;
 
@@ -590,18 +566,18 @@ class Distance {
   static int GJK_ITERS = 0;
   static int GJK_MAX_ITERS = 20;
 
-  final _Simplex _simplex = new _Simplex();
-  final List<int> _saveA = BufferUtils.allocClearIntList(3);
-  final List<int> _saveB = BufferUtils.allocClearIntList(3);
-  final Vector2 _closestPoint = new Vector2.zero();
-  final Vector2 _d = new Vector2.zero();
-  final Vector2 _temp = new Vector2.zero();
-  final Vector2 _normal = new Vector2.zero();
+  final _Simplex _simplex = _Simplex();
+  final List<int> _saveA = BufferUtils.intList(3);
+  final List<int> _saveB = BufferUtils.intList(3);
+  final Vector2 _closestPoint = Vector2.zero();
+  final Vector2 _d = Vector2.zero();
+  final Vector2 _temp = Vector2.zero();
+  final Vector2 _normal = Vector2.zero();
 
   /// Compute the closest points between two shapes. Supports any combination of: CircleShape and
   /// PolygonShape. The simplex cache is input/output. On the first call set SimplexCache.count to
   /// zero.
-  void distance(final DistanceOutput output, final SimplexCache cache,
+  void compute(final DistanceOutput output, final SimplexCache cache,
       final DistanceInput input) {
     GJK_CALLS++;
 
@@ -688,15 +664,15 @@ class Distance {
       // Compute a tentative new simplex vertex using support points.
       _SimplexVertex vertex = vertices[_simplex.count];
 
-      Rot.mulTransUnsafeVec2(transformA.q, _d..negate(), _temp);
+      _temp.setFrom(Rot.mulTransVec2(transformA.q, _d..negate()));
       vertex.indexA = proxyA.getSupport(_temp);
-      Transform.mulToOutUnsafeVec2(
-          transformA, proxyA.getVertex(vertex.indexA), vertex.wA);
+      vertex.wA.setFrom(
+          Transform.mulVec2(transformA, proxyA.getVertex(vertex.indexA)));
       // Vec2 wBLocal;
-      Rot.mulTransUnsafeVec2(transformB.q, _d..negate(), _temp);
+      _temp.setFrom(Rot.mulTransVec2(transformB.q, _d..negate()));
       vertex.indexB = proxyB.getSupport(_temp);
-      Transform.mulToOutUnsafeVec2(
-          transformB, proxyB.getVertex(vertex.indexB), vertex.wB);
+      vertex.wB.setFrom(
+          Transform.mulVec2(transformB, proxyB.getVertex(vertex.indexB)));
       (vertex.w..setFrom(vertex.wB)).sub(vertex.wA);
 
       // Iteration count is equated to the number of support point calls.

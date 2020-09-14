@@ -1,27 +1,3 @@
-/// *****************************************************************************
-/// Copyright (c) 2015, Daniel Murphy, Google
-/// All rights reserved.
-///
-/// Redistribution and use in source and binary forms, with or without modification,
-/// are permitted provided that the following conditions are met:
-///  * Redistributions of source code must retain the above copyright notice,
-///    this list of conditions and the following disclaimer.
-///  * Redistributions in binary form must reproduce the above copyright notice,
-///    this list of conditions and the following disclaimer in the documentation
-///    and/or other materials provided with the distribution.
-///
-/// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-/// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-/// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-/// IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-/// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-/// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-/// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-/// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-/// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-/// POSSIBILITY OF SUCH DAMAGE.
-/// *****************************************************************************
-
 part of box2d;
 
 /// A fixture is used to attach a shape to a body for collision detection. A fixture inherits its
@@ -43,7 +19,7 @@ class Fixture {
   List<FixtureProxy> _proxies;
   int _proxyCount = 0;
 
-  final Filter _filter = new Filter();
+  final Filter _filter = Filter();
 
   bool _isSensor = false;
 
@@ -247,9 +223,9 @@ class Fixture {
     // Reserve proxy space
     int childCount = _shape.getChildCount();
     if (_proxies == null) {
-      _proxies = new List<FixtureProxy>(childCount);
+      _proxies = List<FixtureProxy>(childCount);
       for (int i = 0; i < childCount; i++) {
-        _proxies[i] = new FixtureProxy();
+        _proxies[i] = FixtureProxy();
         _proxies[i].fixture = null;
         _proxies[i].proxyId = BroadPhase.NULL_PROXY;
       }
@@ -258,11 +234,11 @@ class Fixture {
     if (_proxies.length < childCount) {
       List<FixtureProxy> old = _proxies;
       int newLen = Math.max(old.length * 2, childCount);
-      _proxies = new List<FixtureProxy>(newLen);
-      BufferUtils.arraycopy(old, 0, _proxies, 0, old.length);
+      _proxies = List<FixtureProxy>(newLen);
+      BufferUtils.arrayCopy(old, 0, _proxies, 0, old.length);
       for (int i = 0; i < newLen; i++) {
         if (i >= old.length) {
-          _proxies[i] = new FixtureProxy();
+          _proxies[i] = FixtureProxy();
         }
         _proxies[i].fixture = null;
         _proxies[i].proxyId = BroadPhase.NULL_PROXY;
@@ -316,9 +292,9 @@ class Fixture {
     _proxyCount = 0;
   }
 
-  final AABB _pool1 = new AABB();
-  final AABB _pool2 = new AABB();
-  final Vector2 _displacement = new Vector2.zero();
+  final AABB _pool1 = AABB();
+  final AABB _pool2 = AABB();
+  final Vector2 _displacement = Vector2.zero();
 
   /// Internal method
   ///

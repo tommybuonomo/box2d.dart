@@ -1,27 +1,3 @@
-/// *****************************************************************************
-/// Copyright (c) 2015, Daniel Murphy, Google
-/// All rights reserved.
-///
-/// Redistribution and use in source and binary forms, with or without modification,
-/// are permitted provided that the following conditions are met:
-///  * Redistributions of source code must retain the above copyright notice,
-///    this list of conditions and the following disclaimer.
-///  * Redistributions in binary form must reproduce the above copyright notice,
-///    this list of conditions and the following disclaimer in the documentation
-///    and/or other materials provided with the distribution.
-///
-/// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-/// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-/// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-/// IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-/// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-/// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-/// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-/// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-/// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-/// POSSIBILITY OF SUCH DAMAGE.
-/// *****************************************************************************
-
 part of box2d;
 
 /// The pulley joint is connected to two bodies and two fixed ground points. The pulley supports a
@@ -38,8 +14,6 @@ class PulleyJoint extends Joint {
   double _lengthB = 0.0;
 
   // Solver shared
-  final Vector2 _localAnchorA = Vector2.zero();
-  final Vector2 _localAnchorB = Vector2.zero();
   double _constant = 0.0;
   double _ratio = 0.0;
   double _impulse = 0.0;
@@ -59,12 +33,11 @@ class PulleyJoint extends Joint {
   double _invIB = 0.0;
   double _mass = 0.0;
 
-  PulleyJoint(IWorldPool argWorldPool, PulleyJointDef def)
-      : super(argWorldPool, def) {
+  PulleyJoint(PulleyJointDef def) : super(def) {
     _groundAnchorA.setFrom(def.groundAnchorA);
     _groundAnchorB.setFrom(def.groundAnchorB);
-    _localAnchorA.setFrom(def.localAnchorA);
-    _localAnchorB.setFrom(def.localAnchorB);
+    localAnchorA.setFrom(def.localAnchorA);
+    localAnchorB.setFrom(def.localAnchorB);
 
     assert(def.ratio != 0.0);
     _ratio = def.ratio;
@@ -85,44 +58,24 @@ class PulleyJoint extends Joint {
   }
 
   double getCurrentLengthA() {
-    final Vector2 p = pool.popVec2();
-    _bodyA.getWorldPointToOut(_localAnchorA, p);
+    final Vector2 p = Vector2.zero();
+    p.setFrom(_bodyA.getWorldPoint(localAnchorA));
     p.sub(_groundAnchorA);
     double length = p.length;
-    pool.pushVec2(1);
     return length;
   }
 
   double getCurrentLengthB() {
-    final Vector2 p = pool.popVec2();
-    _bodyB.getWorldPointToOut(_localAnchorB, p);
+    final Vector2 p = Vector2.zero();
+    p.setFrom(_bodyB.getWorldPoint(localAnchorB));
     p.sub(_groundAnchorB);
     double length = p.length;
-    pool.pushVec2(1);
     return length;
   }
 
-  Vector2 getLocalAnchorA() {
-    return _localAnchorA;
-  }
-
-  Vector2 getLocalAnchorB() {
-    return _localAnchorB;
-  }
-
-  void getAnchorA(Vector2 argOut) {
-    _bodyA.getWorldPointToOut(_localAnchorA, argOut);
-  }
-
-  void getAnchorB(Vector2 argOut) {
-    _bodyB.getWorldPointToOut(_localAnchorB, argOut);
-  }
-
-  void getReactionForce(double inv_dt, Vector2 argOut) {
-    argOut
-      ..setFrom(_uB)
-      ..scale(_impulse)
-      ..scale(inv_dt);
+  @override
+  Vector2 getReactionForce(double inv_dt) {
+    return Vector2.copy(_uB)..scale(_impulse)..scale(inv_dt);
   }
 
   double getReactionTorque(double inv_dt) {
@@ -135,26 +88,6 @@ class PulleyJoint extends Joint {
 
   Vector2 getGroundAnchorB() {
     return _groundAnchorB;
-  }
-
-  double getLength1() {
-    final Vector2 p = pool.popVec2();
-    _bodyA.getWorldPointToOut(_localAnchorA, p);
-    p.sub(_groundAnchorA);
-
-    double len = p.length;
-    pool.pushVec2(1);
-    return len;
-  }
-
-  double getLength2() {
-    final Vector2 p = pool.popVec2();
-    _bodyB.getWorldPointToOut(_localAnchorB, p);
-    p.sub(_groundAnchorB);
-
-    double len = p.length;
-    pool.pushVec2(1);
-    return len;
   }
 
   double getRatio() {
@@ -181,26 +114,22 @@ class PulleyJoint extends Joint {
     Vector2 vB = data.velocities[_indexB].v;
     double wB = data.velocities[_indexB].w;
 
-    final Rot qA = pool.popRot();
-    final Rot qB = pool.popRot();
-    final Vector2 temp = pool.popVec2();
+    final Rot qA = Rot();
+    final Rot qB = Rot();
+    final Vector2 temp = Vector2.zero();
 
     qA.setAngle(aA);
     qB.setAngle(aB);
 
     // Compute the effective masses.
-    Rot.mulToOutUnsafe(
-        qA,
-        temp
-          ..setFrom(_localAnchorA)
-          ..sub(_localCenterA),
-        _rA);
-    Rot.mulToOutUnsafe(
-        qB,
-        temp
-          ..setFrom(_localAnchorB)
-          ..sub(_localCenterB),
-        _rB);
+    temp
+      ..setFrom(localAnchorA)
+      ..sub(_localCenterA);
+    _rA.setFrom(Rot.mulVec2(qA, temp));
+    temp
+      ..setFrom(localAnchorB)
+      ..sub(_localCenterB);
+    _rB.setFrom(Rot.mulVec2(qB, temp));
 
     _uA
       ..setFrom(cA)
@@ -244,8 +173,8 @@ class PulleyJoint extends Joint {
       _impulse *= data.step.dtRatio;
 
       // Warm starting.
-      final Vector2 PA = pool.popVec2();
-      final Vector2 PB = pool.popVec2();
+      final Vector2 PA = Vector2.zero();
+      final Vector2 PB = Vector2.zero();
 
       PA
         ..setFrom(_uA)
@@ -260,18 +189,11 @@ class PulleyJoint extends Joint {
       vB.x += _invMassB * PB.x;
       vB.y += _invMassB * PB.y;
       wB += _invIB * _rB.cross(PB);
-
-      pool.pushVec2(2);
     } else {
       _impulse = 0.0;
     }
-//    data.velocities[_indexA].v.set(vA);
     data.velocities[_indexA].w = wA;
-//    data.velocities[_indexB].v.set(vB);
     data.velocities[_indexB].w = wB;
-
-    pool.pushVec2(1);
-    pool.pushRot(2);
   }
 
   void solveVelocityConstraints(final SolverData data) {
@@ -280,10 +202,10 @@ class PulleyJoint extends Joint {
     Vector2 vB = data.velocities[_indexB].v;
     double wB = data.velocities[_indexB].w;
 
-    final Vector2 vpA = pool.popVec2();
-    final Vector2 vpB = pool.popVec2();
-    final Vector2 PA = pool.popVec2();
-    final Vector2 PB = pool.popVec2();
+    final Vector2 vpA = Vector2.zero();
+    final Vector2 vpB = Vector2.zero();
+    final Vector2 PA = Vector2.zero();
+    final Vector2 PB = Vector2.zero();
 
     _rA.scaleOrthogonalInto(wA, vpA);
     vpA.add(vA);
@@ -307,24 +229,20 @@ class PulleyJoint extends Joint {
     vB.y += _invMassB * PB.y;
     wB += _invIB * _rB.cross(PB);
 
-//    data.velocities[_indexA].v.set(vA);
     data.velocities[_indexA].w = wA;
-//    data.velocities[_indexB].v.set(vB);
     data.velocities[_indexB].w = wB;
-
-    pool.pushVec2(4);
   }
 
   bool solvePositionConstraints(final SolverData data) {
-    final Rot qA = pool.popRot();
-    final Rot qB = pool.popRot();
-    final Vector2 rA = pool.popVec2();
-    final Vector2 rB = pool.popVec2();
-    final Vector2 uA = pool.popVec2();
-    final Vector2 uB = pool.popVec2();
-    final Vector2 temp = pool.popVec2();
-    final Vector2 PA = pool.popVec2();
-    final Vector2 PB = pool.popVec2();
+    final Rot qA = Rot();
+    final Rot qB = Rot();
+    final Vector2 rA = Vector2.zero();
+    final Vector2 rB = Vector2.zero();
+    final Vector2 uA = Vector2.zero();
+    final Vector2 uB = Vector2.zero();
+    final Vector2 temp = Vector2.zero();
+    final Vector2 PA = Vector2.zero();
+    final Vector2 PB = Vector2.zero();
 
     Vector2 cA = data.positions[_indexA].c;
     double aA = data.positions[_indexA].a;
@@ -333,19 +251,14 @@ class PulleyJoint extends Joint {
 
     qA.setAngle(aA);
     qB.setAngle(aB);
-
-    Rot.mulToOutUnsafe(
-        qA,
-        temp
-          ..setFrom(_localAnchorA)
-          ..sub(_localCenterA),
-        rA);
-    Rot.mulToOutUnsafe(
-        qB,
-        temp
-          ..setFrom(_localAnchorB)
-          ..sub(_localCenterB),
-        rB);
+    temp
+      ..setFrom(localAnchorA)
+      ..sub(_localCenterA);
+    rA.setFrom(Rot.mulVec2(qA, temp));
+    temp
+      ..setFrom(localAnchorB)
+      ..sub(_localCenterB);
+    rB.setFrom(Rot.mulVec2(qB, temp));
 
     uA
       ..setFrom(cA)
@@ -403,13 +316,8 @@ class PulleyJoint extends Joint {
     cB.y += _invMassB * PB.y;
     aB += _invIB * rB.cross(PB);
 
-//    data.positions[_indexA].c.set(cA);
     data.positions[_indexA].a = aA;
-//    data.positions[_indexB].c.set(cB);
     data.positions[_indexB].a = aB;
-
-    pool.pushRot(2);
-    pool.pushVec2(7);
 
     return linearError < Settings.linearSlop;
   }

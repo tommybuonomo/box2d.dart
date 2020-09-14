@@ -1,26 +1,3 @@
-/// *****************************************************************************
-/// Copyright (c) 2015, Daniel Murphy, Google
-/// All rights reserved.
-///
-/// Redistribution and use in source and binary forms, with or without modification,
-/// are permitted provided that the following conditions are met:
-///  * Redistributions of source code must retain the above copyright notice,
-///    this list of conditions and the following disclaimer.
-///  * Redistributions in binary form must reproduce the above copyright notice,
-///    this list of conditions and the following disclaimer in the documentation
-///    and/or other materials provided with the distribution.
-///
-/// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-/// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-/// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-/// IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-/// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-/// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-/// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-/// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-/// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-/// POSSIBILITY OF SUCH DAMAGE.
-/// *****************************************************************************
 part of box2d;
 
 /// The class manages contact between two shapes. A contact exists for each overlapping AABB in the
@@ -67,12 +44,7 @@ abstract class Contact {
 
   double _tangentSpeed = 0.0;
 
-  final IWorldPool _pool;
-
-  Contact(this._pool);
-
-  /// initialization for pooling
-  void init(Fixture fA, int indexA, Fixture fB, int indexB) {
+  Contact(Fixture fA, int indexA, Fixture fB, int indexB) {
     _flags = ENABLED_FLAG;
 
     _fixtureA = fA;
@@ -101,6 +73,37 @@ abstract class Contact {
     _restitution = Contact.mixRestitution(fA._restitution, fB._restitution);
 
     _tangentSpeed = 0.0;
+  }
+
+  static Contact init(Fixture fA, int indexA, Fixture fB, int indexB) {
+    // Remember that we use the order in the enum here to determine in which
+    // order the arguments should come in the different contact classes.
+    // { CIRCLE, EDGE, POLYGON, CHAIN }
+    ShapeType typeA =
+        fA.getType().index < fB.getType().index ? fA.getType() : fB.getType();
+    ShapeType typeB = fA.getType() == typeA ? fB.getType() : fA.getType();
+    Fixture temp = fA;
+    fA = fA.getType() == typeA ? fA : fB;
+    fB = fB.getType() == typeB ? fB : temp;
+
+    if (typeA == ShapeType.CIRCLE && typeB == ShapeType.CIRCLE) {
+      return CircleContact(fA, fB);
+    } else if (typeA == ShapeType.POLYGON && typeB == ShapeType.POLYGON) {
+      return PolygonContact(fA, fB);
+    } else if (typeA == ShapeType.CIRCLE && typeB == ShapeType.POLYGON) {
+      return PolygonAndCircleContact(fB, fA);
+    } else if (typeA == ShapeType.CIRCLE && typeB == ShapeType.EDGE) {
+      return EdgeAndCircleContact(fB, indexB, fA, indexA);
+    } else if (typeA == ShapeType.CIRCLE && typeB == ShapeType.POLYGON) {
+      return EdgeAndPolygonContact(fA, indexA, fB, indexB);
+    } else if (typeA == ShapeType.CIRCLE && typeB == ShapeType.CHAIN) {
+      return ChainAndCircleContact(fB, indexB, fA, indexA);
+    } else if (typeA == ShapeType.POLYGON && typeB == ShapeType.CHAIN) {
+      return ChainAndPolygonContact(fB, indexB, fA, indexA);
+    } else {
+      assert(false, "Not compatible contact type");
+      return CircleContact(fA, fB);
+    }
   }
 
   /// Get the world manifold.
@@ -189,14 +192,11 @@ abstract class Contact {
     Body bodyB = _fixtureB.getBody();
     Transform xfA = bodyA._transform;
     Transform xfB = bodyB._transform;
-    // log.debug("TransformA: "+xfA);
-    // log.debug("TransformB: "+xfB);
 
     if (sensor) {
       Shape shapeA = _fixtureA.getShape();
       Shape shapeB = _fixtureB.getShape();
-      touching = _pool
-          .getCollision()
+      touching = World.collision
           .testOverlap(shapeA, _indexA, shapeB, _indexB, xfA, xfB);
 
       // Sensors don't generate manifolds.

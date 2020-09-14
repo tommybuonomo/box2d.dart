@@ -1,27 +1,3 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 
 class DynamicTreeFlatNodes implements BroadPhaseStrategy {
@@ -42,18 +18,18 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
 
   int _freeList;
 
-  final List<Vector2> drawVecs = new List<Vector2>(4);
+  final List<Vector2> drawVecs = List<Vector2>(4);
 
   DynamicTreeFlatNodes() {
     _expandBuffers(0, _nodeCapacity);
 
     for (int i = 0; i < drawVecs.length; i++) {
-      drawVecs[i] = new Vector2.zero();
+      drawVecs[i] = Vector2.zero();
     }
   }
 
-  static AABB allocAABB() => new AABB();
-  static Object allocObject() => new Object();
+  static AABB allocAABB() => AABB();
+  static Object allocObject() => Object();
 
   void _expandBuffers(int oldSize, int newSize) {
     _aabb = BufferUtils.reallocateBufferWithAlloc(
@@ -67,7 +43,7 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
 
     // Build a linked list for the free list.
     for (int i = oldSize; i < newSize; i++) {
-      _aabb[i] = new AABB();
+      _aabb[i] = AABB();
       _parent[i] = (i == newSize - 1) ? NULL_NODE : i + 1;
       _height[i] = -1;
       _child1[i] = -1;
@@ -152,7 +128,7 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
     return _aabb[proxyId];
   }
 
-  List<int> _nodeStack = BufferUtils.allocClearIntList(20);
+  List<int> _nodeStack = BufferUtils.intList(20);
   int _nodeStackIndex = 0;
 
   void query(TreeCallback callback, AABB aabb) {
@@ -184,9 +160,9 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
     }
   }
 
-  final Vector2 _r = new Vector2.zero();
-  final AABB _aabbTemp = new AABB();
-  final RayCastInput _subInput = new RayCastInput();
+  final Vector2 _r = Vector2.zero();
+  final AABB _aabbTemp = AABB();
+  final RayCastInput _subInput = RayCastInput();
 
   void raycast(TreeRayCastCallback callback, RayCastInput input) {
     final Vector2 p1 = input.p1;
@@ -218,18 +194,12 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
 
     // Build a bounding box for the segment.
     final AABB segAABB = _aabbTemp;
-    // Vec2 t = p1 + maxFraction * (p2 - p1);
-    // before inline
-    // temp.set(p2).subLocal(p1).mulLocal(maxFraction).addLocal(p1);
-    // Vec2.minToOut(p1, temp, segAABB.lowerBound);
-    // Vec2.maxToOut(p1, temp, segAABB.upperBound);
     tempx = (p2x - p1x) * maxFraction + p1x;
     tempy = (p2y - p1y) * maxFraction + p1y;
     segAABB.lowerBound.x = p1x < tempx ? p1x : tempx;
     segAABB.lowerBound.y = p1y < tempy ? p1y : tempy;
     segAABB.upperBound.x = p1x > tempx ? p1x : tempx;
     segAABB.upperBound.y = p1y > tempy ? p1y : tempy;
-    // end inline
 
     _nodeStackIndex = 0;
     _nodeStack[_nodeStackIndex++] = _root;
@@ -246,8 +216,6 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
 
       // Separating axis for segment (Gino, p80).
       // |dot(v, p1 - c)| > dot(|v|, h)
-      // node.aabb.getCenterToOut(c);
-      // node.aabb.getExtentsToOut(h);
       cx = (nodeAABB.lowerBound.x + nodeAABB.upperBound.x) * .5;
       cy = (nodeAABB.lowerBound.y + nodeAABB.upperBound.y) * .5;
       hx = (nodeAABB.upperBound.x - nodeAABB.lowerBound.x) * .5;
@@ -278,9 +246,6 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
         if (value > 0.0) {
           // Update segment bounding box.
           maxFraction = value;
-          // temp.set(p2).subLocal(p1).mulLocal(maxFraction).addLocal(p1);
-          // Vec2.minToOut(p1, temp, segAABB.lowerBound);
-          // Vec2.maxToOut(p1, temp, segAABB.upperBound);
           tempx = (p2x - p1x) * maxFraction + p1x;
           tempy = (p2y - p1y) * maxFraction + p1y;
           segAABB.lowerBound.x = p1x < tempx ? p1x : tempx;
@@ -399,7 +364,7 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
     _nodeCount--;
   }
 
-  final AABB _combinedAABB = new AABB();
+  final AABB _combinedAABB = AABB();
 
   void _insertLeaf(int leaf) {
     if (_root == NULL_NODE) {
@@ -589,8 +554,6 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
       int iG = _child2[C];
       int F = iF;
       int G = iG;
-      // assert (F != null);
-      // assert (G != null);
       assert(0 <= iF && iF < _nodeCapacity);
       assert(0 <= iG && iG < _nodeCapacity);
 
@@ -741,7 +704,7 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
     height = 1 + Math.max<int>(height1, height2);
     assert(_height[node] == height);
 
-    AABB aabb = new AABB();
+    AABB aabb = AABB();
     aabb.combine2(_aabb[child1], _aabb[child2]);
 
     assert(MathUtils.vector2Equals(aabb.lowerBound, _aabb[node].lowerBound));
@@ -759,7 +722,7 @@ class DynamicTreeFlatNodes implements BroadPhaseStrategy {
     drawTreeX(argDraw, _root, 0, height);
   }
 
-  final Color3i _color = new Color3i.zero();
+  final Color3i _color = Color3i.zero();
 
   void drawTreeX(DebugDraw argDraw, int node, int spot, int height) {
     AABB a = _aabb[node];

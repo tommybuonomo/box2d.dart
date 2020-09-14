@@ -1,27 +1,3 @@
-/// *****************************************************************************
-/// Copyright (c) 2015, Daniel Murphy, Google
-/// All rights reserved.
-///
-/// Redistribution and use in source and binary forms, with or without modification,
-/// are permitted provided that the following conditions are met:
-///  * Redistributions of source code must retain the above copyright notice,
-///    this list of conditions and the following disclaimer.
-///  * Redistributions in binary form must reproduce the above copyright notice,
-///    this list of conditions and the following disclaimer in the documentation
-///    and/or other materials provided with the distribution.
-///
-/// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-/// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-/// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-/// IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-/// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-/// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-/// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-/// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-/// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-/// POSSIBILITY OF SUCH DAMAGE.
-/// *****************************************************************************
-
 part of box2d;
 
 /// An axis-aligned bounding box.
@@ -76,17 +52,7 @@ class AABB {
   }
 
   /// Get the center of the AABB
-  Vector2 getCenter() {
-    final Vector2 center = Vector2.copy(lowerBound);
-    center.add(upperBound);
-    center.scale(.5);
-    return center;
-  }
-
-  void getCenterToOut(final Vector2 out) {
-    out.x = (lowerBound.x + upperBound.x) * .5;
-    out.y = (lowerBound.y + upperBound.y) * .5;
-  }
+  Vector2 getCenter() => (lowerBound + upperBound)..scale(0.5);
 
   /// Get the extents of the AABB (half-widths).
   Vector2 getExtents() {
@@ -154,20 +120,22 @@ class AABB {
   }
 
   /// @deprecated please use {@link #raycast(RayCastOutput, RayCastInput, IWorldPool)} for better performance
-  bool raycast(final RayCastOutput output, final RayCastInput input) {
-    return raycastWithPool(output, input, DefaultWorldPool(4, 4));
-  }
+  //bool raycast(final RayCastOutput output, final RayCastInput input) {
+  //  return raycastWithPool(output, input, DefaultWorldPool(4, 4));
+  //}
 
   /// From Real-time Collision Detection, p179.
-  bool raycastWithPool(final RayCastOutput output, final RayCastInput input,
-      IWorldPool argPool) {
+  bool raycastWithPool(
+    final RayCastOutput output,
+    final RayCastInput input,
+  ) {
     double tmin = -double.maxFinite;
     double tmax = double.maxFinite;
 
-    final Vector2 p = argPool.popVec2();
-    final Vector2 d = argPool.popVec2();
-    final Vector2 absD = argPool.popVec2();
-    final Vector2 normal = argPool.popVec2();
+    final Vector2 p = Vector2.zero();
+    final Vector2 d = Vector2.zero();
+    final Vector2 absD = Vector2.zero();
+    final Vector2 normal = Vector2.zero();
 
     p.setFrom(input.p1);
     d
@@ -181,7 +149,6 @@ class AABB {
     if (absD.x < Settings.EPSILON) {
       // Parallel.
       if (p.x < lowerBound.x || upperBound.x < p.x) {
-        argPool.pushVec2(4);
         return false;
       }
     } else {
@@ -210,7 +177,6 @@ class AABB {
       tmax = Math.min(tmax, t2);
 
       if (tmin > tmax) {
-        argPool.pushVec2(4);
         return false;
       }
     }
@@ -218,7 +184,6 @@ class AABB {
     if (absD.y < Settings.EPSILON) {
       // Parallel.
       if (p.y < lowerBound.y || upperBound.y < p.y) {
-        argPool.pushVec2(4);
         return false;
       }
     } else {
@@ -247,7 +212,6 @@ class AABB {
       tmax = Math.min(tmax, t2);
 
       if (tmin > tmax) {
-        argPool.pushVec2(4);
         return false;
       }
     }
@@ -255,7 +219,6 @@ class AABB {
     // Does the ray start inside the box?
     // Does the ray intersect beyond the max fraction?
     if (tmin < 0.0 || input.maxFraction < tmin) {
-      argPool.pushVec2(4);
       return false;
     }
 
@@ -263,7 +226,6 @@ class AABB {
     output.fraction = tmin;
     output.normal.x = normal.x;
     output.normal.y = normal.y;
-    argPool.pushVec2(4);
     return true;
   }
 

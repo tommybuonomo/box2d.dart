@@ -1,27 +1,3 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 
 /// A dynamic tree arranges data in a binary tree to accelerate queries such as volume queries and
@@ -157,7 +133,7 @@ class DynamicTree implements BroadPhaseStrategy {
           if (nodeStack.length - nodeStackIndex - 2 <= 0) {
             List<DynamicTreeNode> newBuffer =
                 List<DynamicTreeNode>(nodeStack.length * 2);
-            BufferUtils.arraycopy(nodeStack, 0, newBuffer, 0, nodeStack.length);
+            BufferUtils.arrayCopy(nodeStack, 0, newBuffer, 0, nodeStack.length);
             nodeStack = newBuffer;
           }
           nodeStack[nodeStackIndex++] = node.child1;
@@ -201,18 +177,12 @@ class DynamicTree implements BroadPhaseStrategy {
 
     // Build a bounding box for the segment.
     final AABB segAABB = _aabb;
-    // Vec2 t = p1 + maxFraction * (p2 - p1);
-    // before inline
-    // temp.set(p2).subLocal(p1).mulLocal(maxFraction).addLocal(p1);
-    // Vec2.minToOut(p1, temp, segAABB.lowerBound);
-    // Vec2.maxToOut(p1, temp, segAABB.upperBound);
     tempx = (p2x - p1x) * maxFraction + p1x;
     tempy = (p2y - p1y) * maxFraction + p1y;
-    segAABB.lowerBound.x = p1x < tempx ? p1x : tempx;
-    segAABB.lowerBound.y = p1y < tempy ? p1y : tempy;
-    segAABB.upperBound.x = p1x > tempx ? p1x : tempx;
-    segAABB.upperBound.y = p1y > tempy ? p1y : tempy;
-    // end inline
+    segAABB.lowerBound.x = Math.min(p1x, tempx);
+    segAABB.lowerBound.y = Math.min(p1y, tempy);
+    segAABB.upperBound.x = Math.max(p1x, tempx);
+    segAABB.upperBound.y = Math.max(p1y, tempy);
 
     nodeStackIndex = 0;
     nodeStack[nodeStackIndex++] = _root;
@@ -229,8 +199,6 @@ class DynamicTree implements BroadPhaseStrategy {
 
       // Separating axis for segment (Gino, p80).
       // |dot(v, p1 - c)| > dot(|v|, h)
-      // node.aabb.getCenterToOut(c);
-      // node.aabb.getExtentsToOut(h);
       cx = (nodeAABB.lowerBound.x + nodeAABB.upperBound.x) * .5;
       cy = (nodeAABB.lowerBound.y + nodeAABB.upperBound.y) * .5;
       hx = (nodeAABB.upperBound.x - nodeAABB.lowerBound.x) * .5;
@@ -260,21 +228,18 @@ class DynamicTree implements BroadPhaseStrategy {
         if (value > 0.0) {
           // Update segment bounding box.
           maxFraction = value;
-          // temp.set(p2).subLocal(p1).mulLocal(maxFraction).addLocal(p1);
-          // Vec2.minToOut(p1, temp, segAABB.lowerBound);
-          // Vec2.maxToOut(p1, temp, segAABB.upperBound);
           tempx = (p2x - p1x) * maxFraction + p1x;
           tempy = (p2y - p1y) * maxFraction + p1y;
-          segAABB.lowerBound.x = p1x < tempx ? p1x : tempx;
-          segAABB.lowerBound.y = p1y < tempy ? p1y : tempy;
-          segAABB.upperBound.x = p1x > tempx ? p1x : tempx;
-          segAABB.upperBound.y = p1y > tempy ? p1y : tempy;
+          segAABB.lowerBound.x = Math.min(p1x, tempx);
+          segAABB.lowerBound.y = Math.min(p1y, tempy);
+          segAABB.upperBound.x = Math.max(p1x, tempx);
+          segAABB.upperBound.y = Math.max(p1y, tempy);
         }
       } else {
         if (nodeStack.length - nodeStackIndex - 2 <= 0) {
           List<DynamicTreeNode> newBuffer =
               List<DynamicTreeNode>(nodeStack.length * 2);
-          BufferUtils.arraycopy(nodeStack, 0, newBuffer, 0, nodeStack.length);
+          BufferUtils.arrayCopy(nodeStack, 0, newBuffer, 0, nodeStack.length);
           nodeStack = newBuffer;
         }
         nodeStack[nodeStackIndex++] = node.child1;
@@ -333,7 +298,7 @@ class DynamicTree implements BroadPhaseStrategy {
         continue;
       }
 
-      assert((node.child1 == null) == false);
+      assert(node.child1 != null);
 
       DynamicTreeNode child1 = node.child1;
       DynamicTreeNode child2 = node.child2;
@@ -368,7 +333,7 @@ class DynamicTree implements BroadPhaseStrategy {
 
   /// Build an optimal tree. Very expensive. For testing.
   void rebuildBottomUp() {
-    List<int> nodes = BufferUtils.allocClearIntList(_nodeCount);
+    List<int> nodes = BufferUtils.intList(_nodeCount);
     int count = 0;
 
     // Build array of leaves. Free the rest.
@@ -439,7 +404,7 @@ class DynamicTree implements BroadPhaseStrategy {
       List<DynamicTreeNode> old = _nodes;
       _nodeCapacity *= 2;
       _nodes = List<DynamicTreeNode>(_nodeCapacity);
-      BufferUtils.arraycopy(old, 0, _nodes, 0, old.length);
+      BufferUtils.arrayCopy(old, 0, _nodes, 0, old.length);
 
       // Build a linked list for the free list.
       for (int i = _nodeCapacity - 1; i >= _nodeCount; i--) {

@@ -1,27 +1,3 @@
-/// *****************************************************************************
-/// Copyright (c) 2015, Daniel Murphy, Google
-/// All rights reserved.
-///
-/// Redistribution and use in source and binary forms, with or without modification,
-/// are permitted provided that the following conditions are met:
-///  * Redistributions of source code must retain the above copyright notice,
-///    this list of conditions and the following disclaimer.
-///  * Redistributions in binary form must reproduce the above copyright notice,
-///    this list of conditions and the following disclaimer in the documentation
-///    and/or other materials provided with the distribution.
-///
-/// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-/// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-/// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-/// IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-/// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-/// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-/// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-/// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-/// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-/// POSSIBILITY OF SUCH DAMAGE.
-/// *****************************************************************************
-
 part of box2d;
 
 class ParticleBuffer<T> {
@@ -213,7 +189,7 @@ PsTriad allocPsTriad() => PsTriad();
 
 // Callback used with VoronoiDiagram.
 class CreateParticleGroupCallback implements VoronoiDiagramCallback {
-  void callback(int a, int b, int c) {
+  void call(int a, int b, int c) {
     final Vector2 pa = system.positionBuffer.data[a];
     final Vector2 pb = system.positionBuffer.data[b];
     final Vector2 pc = system.positionBuffer.data[c];
@@ -268,7 +244,7 @@ class CreateParticleGroupCallback implements VoronoiDiagramCallback {
 
 // Callback used with VoronoiDiagram.
 class JoinParticleGroupsCallback implements VoronoiDiagramCallback {
-  void callback(int a, int b, int c) {
+  void call(int a, int b, int c) {
     // Create a triad if it will contain particles from both groups.
     int countA = ((a < groupB._firstIndex) ? 1 : 0) +
         ((b < groupB._firstIndex) ? 1 : 0) +
@@ -336,8 +312,6 @@ class SolveCollisionCallback implements QueryCallback {
 
   final RayCastInput input = RayCastInput();
   final RayCastOutput output = RayCastOutput();
-  final Vector2 tempVec = Vector2.zero();
-  final Vector2 tempVec2 = Vector2.zero();
 
   bool reportFixture(Fixture fixture) {
     if (fixture.isSensor()) {
@@ -375,20 +349,20 @@ class SolveCollisionCallback implements QueryCallback {
             aabblowerBoundy <= ap.y &&
             ap.y <= aabbupperBoundy) {
           Vector2 av = system.velocityBuffer.data[a];
-          final Vector2 temp = tempVec;
-          Transform.mulTransToOutUnsafeVec2(body._xf0, ap, temp);
-          Transform.mulToOutUnsafeVec2(body._transform, temp, input.p1);
+          final Vector2 temp = Transform.mulTransVec2(body._xf0, ap);
+          input.p1.setFrom(Transform.mulVec2(body._transform, temp));
           input.p2.x = ap.x + step.dt * av.x;
           input.p2.y = ap.y + step.dt * av.y;
           input.maxFraction = 1.0;
           if (fixture.raycast(output, input, childIndex)) {
-            final Vector2 p = tempVec;
-            p.x = (1 - output.fraction) * input.p1.x +
-                output.fraction * input.p2.x +
-                Settings.linearSlop * output.normal.x;
-            p.y = (1 - output.fraction) * input.p1.y +
-                output.fraction * input.p2.y +
-                Settings.linearSlop * output.normal.y;
+            final Vector2 p = Vector2(
+              (1 - output.fraction) * input.p1.x +
+                  output.fraction * input.p2.x +
+                  Settings.linearSlop * output.normal.x,
+              (1 - output.fraction) * input.p1.y +
+                  output.fraction * input.p2.y +
+                  Settings.linearSlop * output.normal.y,
+            );
 
             final double vx = step.inv_dt * (p.x - ap.x);
             final double vy = step.inv_dt * (p.y - ap.y);
@@ -399,9 +373,7 @@ class SolveCollisionCallback implements QueryCallback {
             final double ay = particleMass * (av.y - vy);
             Vector2 b = output.normal;
             final double fdn = ax * b.x + ay * b.y;
-            final Vector2 f = tempVec2;
-            f.x = fdn * b.x;
-            f.y = fdn * b.y;
+            final Vector2 f = Vector2(fdn * b.x, fdn * b.y);
             body.applyLinearImpulse(f, p, true);
           }
         }
@@ -738,7 +710,7 @@ class ParticleSystem {
           p.x = x;
           p.y = y;
           if (shape.testPoint(identity, p)) {
-            Transform.mulToOutVec2(transform, p, p);
+            p.setFrom(Transform.mulVec2(transform, p));
             particleDef.position.x = p.x;
             particleDef.position.y = p.y;
             p.sub(groupDef.position);
@@ -989,7 +961,7 @@ class ParticleSystem {
     }
   }
 
-  static ParticleContact allocParticleContact() => new ParticleContact();
+  static ParticleContact allocParticleContact() => ParticleContact();
 
   void addContact(int a, int b) {
     assert(a != b);
@@ -1073,8 +1045,7 @@ class ParticleSystem {
     }
   }
 
-  final UpdateBodyContactsCallback _ubccallback =
-      new UpdateBodyContactsCallback();
+  final UpdateBodyContactsCallback _ubccallback = UpdateBodyContactsCallback();
 
   void updateBodyContacts() {
     final AABB aabb = _temp;
@@ -1097,7 +1068,7 @@ class ParticleSystem {
     world.queryAABB(_ubccallback, aabb);
   }
 
-  SolveCollisionCallback _sccallback = new SolveCollisionCallback();
+  SolveCollisionCallback _sccallback = SolveCollisionCallback();
 
   void solveCollision(TimeStep step) {
     final AABB aabb = _temp;
@@ -1339,17 +1310,14 @@ class ParticleSystem {
   void solveWall(TimeStep step) {
     for (int i = 0; i < count; i++) {
       if ((flagsBuffer.data[i] & ParticleType.b2_wallParticle) != 0) {
-        final Vector2 r = velocityBuffer.data[i];
-        r.x = 0.0;
-        r.y = 0.0;
+        velocityBuffer.data[i].setFrom(Vector2.zero());
       }
     }
   }
 
-  final Vector2 _tempVec2 = new Vector2.zero();
-  final Rot _tempRot = new Rot();
-  final Transform _tempXf = new Transform.zero();
-  final Transform _tempXf2 = new Transform.zero();
+  final Rot _tempRot = Rot();
+  final Transform _tempXf = Transform.zero();
+  final Transform _tempXf2 = Transform.zero();
 
   void solveRigid(final TimeStep step) {
     for (ParticleGroup group = groupList;
@@ -1358,26 +1326,26 @@ class ParticleSystem {
       if ((group._groupFlags & ParticleGroupType.b2_rigidParticleGroup) != 0) {
         group.updateStatistics();
         Vector2 temp = _tempVec;
-        Vector2 cross = _tempVec2;
         Rot rotation = _tempRot;
         rotation.setAngle(step.dt * group._angularVelocity);
-        Rot.mulToOutUnsafe(rotation, group._center, cross);
+        Vector2 cross = Rot.mulVec2(rotation, group._center);
         temp
           ..setFrom(group._linearVelocity)
           ..scale(step.dt)
           ..add(group._center)
           ..sub(cross);
         _tempXf.p.setFrom(temp);
-        _tempXf.q.set(rotation);
-        Transform.mulToOut(_tempXf, group._transform, group._transform);
+        _tempXf.q.setFrom(rotation);
+        group._transform.set(Transform.mul(_tempXf, group._transform));
         final Transform velocityTransform = _tempXf2;
         velocityTransform.p.x = step.inv_dt * _tempXf.p.x;
         velocityTransform.p.y = step.inv_dt * _tempXf.p.y;
         velocityTransform.q.s = step.inv_dt * _tempXf.q.s;
         velocityTransform.q.c = step.inv_dt * (_tempXf.q.c - 1);
         for (int i = group._firstIndex; i < group._lastIndex; i++) {
-          Transform.mulToOutUnsafeVec2(velocityTransform,
-              positionBuffer.data[i], velocityBuffer.data[i]);
+          velocityBuffer.data[i].setFrom(
+            Transform.mulVec2(velocityTransform, positionBuffer.data[i]),
+          );
         }
       }
     }
@@ -1658,7 +1626,7 @@ class ParticleSystem {
   void solveZombie() {
     // removes particles with zombie flag
     int newCount = 0;
-    List<int> newIndices = BufferUtils.allocClearIntList(count);
+    List<int> newIndices = BufferUtils.intList(count);
     for (int i = 0; i < count; i++) {
       int flags = flagsBuffer.data[i];
       if ((flags & ParticleType.b2_zombieParticle) != 0) {
@@ -1847,7 +1815,7 @@ class ParticleSystem {
     }
   }
 
-  final NewIndices _newIndices = new NewIndices();
+  final NewIndices _newIndices = NewIndices();
 
   void RotateBuffer(int start, int mid, int end) {
     // move the particles assigned to the given group toward the end of array
@@ -2182,9 +2150,7 @@ class ParticleSystem {
         _tempVec.x = px + t * vx;
         _tempVec.y = py + t * vy;
         n.normalize();
-        final Vector2 point = _tempVec2;
-        point.x = point1.x + t * vx;
-        point.y = point1.y + t * vy;
+        final Vector2 point = Vector2(point1.x + t * vx, point1.y + t * vy);
         double f = callback.reportParticle(i, point, n, t);
         fraction = Math.min(fraction, f);
         if (fraction <= 0) {

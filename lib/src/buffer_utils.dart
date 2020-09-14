@@ -1,27 +1,3 @@
-/// *****************************************************************************
-/// Copyright (c) 2015, Daniel Murphy, Google
-/// All rights reserved.
-///
-/// Redistribution and use in source and binary forms, with or without modification,
-/// are permitted provided that the following conditions are met:
-///  * Redistributions of source code must retain the above copyright notice,
-///    this list of conditions and the following disclaimer.
-///  * Redistributions in binary form must reproduce the above copyright notice,
-///    this list of conditions and the following disclaimer in the documentation
-///    and/or other materials provided with the distribution.
-///
-/// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-/// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-/// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-/// IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-/// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-/// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-/// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-/// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-/// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-/// POSSIBILITY OF SUCH DAMAGE.
-/// *****************************************************************************
-
 library box2d.buffer_utils;
 
 import 'dart:typed_data';
@@ -32,7 +8,7 @@ List<T> reallocateBufferWithAlloc<T>(
   assert(newCapacity > oldCapacity);
   List<T> newBuffer = List<T>(newCapacity);
   if (oldBuffer != null) {
-    arraycopy(oldBuffer, 0, newBuffer, 0, oldCapacity);
+    arrayCopy(oldBuffer, 0, newBuffer, 0, oldCapacity);
   }
   for (int i = oldCapacity; i < newCapacity; i++) {
     try {
@@ -50,7 +26,7 @@ List<int> reallocateBufferInt(
   assert(newCapacity > oldCapacity);
   List<int> newBuffer = List<int>(newCapacity);
   if (oldBuffer != null) {
-    arraycopy(oldBuffer, 0, newBuffer, 0, oldCapacity);
+    arrayCopy(oldBuffer, 0, newBuffer, 0, oldCapacity);
   }
   for (int i = oldCapacity; i < newCapacity; i++) {
     newBuffer[i] = 0;
@@ -64,7 +40,7 @@ Float64List reallocateBuffer(
   assert(newCapacity > oldCapacity);
   Float64List newBuffer = Float64List(newCapacity);
   if (oldBuffer != null) {
-    arraycopy(oldBuffer, 0, newBuffer, 0, oldCapacity);
+    arrayCopy(oldBuffer, 0, newBuffer, 0, oldCapacity);
   }
   return newBuffer;
 }
@@ -111,8 +87,8 @@ Float64List reallocateBufferFloat64Deferred(Float64List buffer,
 }
 
 /// Rotate an array, see std::rotate
-void rotate<T>(List<T> ray, int first, int new_first, int last) {
-  int next = new_first;
+void rotate<T>(List<T> ray, int first, int newFirst, int last) {
+  int next = newFirst;
   while (next != first) {
     var temp = ray[first];
     ray[first] = ray[next];
@@ -120,18 +96,18 @@ void rotate<T>(List<T> ray, int first, int new_first, int last) {
     first++;
     next++;
     if (next == last) {
-      next = new_first;
-    } else if (first == new_first) {
-      new_first = next;
+      next = newFirst;
+    } else if (first == newFirst) {
+      newFirst = next;
     }
   }
 }
 
 /// Helper function to allocate a list of integers and set all elements to 0.
-List<int> allocClearIntList(int size) => List<int>.filled(size, 0);
+List<int> intList(int size) => List<int>.filled(size, 0);
 
 /// Helper function for ease of porting Java to Dart.
-void arraycopy(List src, int srcPos, List dest, int destPos, int length) {
+void arrayCopy(List src, int srcPos, List dest, int destPos, int length) {
   dest.setRange(destPos, length + destPos, src, srcPos);
 }
 
