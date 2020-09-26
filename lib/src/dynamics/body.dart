@@ -77,6 +77,8 @@ class Body {
 
   double _sleepTime = 0.0;
 
+  bool isInDebugMode = false;
+
   /// Use this to store your application specific data.
   Object userData;
 
@@ -86,6 +88,7 @@ class Body {
     assert(bd.gravityScale >= 0.0);
     assert(bd.angularDamping >= 0.0);
     assert(bd.linearDamping >= 0.0);
+    assert(isInDebugMode = true);
 
     _flags = 0;
 
@@ -828,7 +831,9 @@ class Body {
       _force.setZero();
       _torque = 0.0;
     }
-    print("awake");
+    if (!isInDebugMode) {
+      print("awake");
+    }
   }
 
   /// Get the sleeping state of this body.
