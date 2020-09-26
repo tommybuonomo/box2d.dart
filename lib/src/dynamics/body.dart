@@ -828,6 +828,7 @@ class Body {
       _force.setZero();
       _torque = 0.0;
     }
+    print("awake");
   }
 
   /// Get the sleeping state of this body.
